@@ -4,6 +4,13 @@ library(leafletwrappers)
 library(tidyverse)
 library(acsmapping)
 library(shinythemes)
+library(openxlsx)
+library(sf)
+library(tpfuncts)
+library(mapview)
+
+# setwd("~/r_proj/demogmap/tpdemographicmap")
+# rsconnect::deployApp(appName = "tpdemographicmap", appTitle = "Takoma Park Demographic Map", account = "takomapark")
 
 tp_bg <- readRDS("./data/bg_tp.rds")
 
@@ -15,16 +22,38 @@ mont_tract <- readRDS("./data/mont_tract.rds")
 
 mont_place <- readRDS("./data/mont_place.rds")
 
-# tp_place <- readRDS("./data/2020/takomapark/place_tp.rds")
+tp_place <- readRDS("./data/place_tp.rds")
+
+fipsmatch <- list(
+  "Montgomery County" = "031", 
+  "PG County" = "033",
+  "DC" = "001"
+)
+
+
+filtfunct <- function(df, filtlist){
+  
+  filtvals <- unlist(
+    fipsmatch[filtlist], 
+    use.names = F
+  )
+  
+  df %>%
+    dplyr::filter(countyfp %in% filtvals | tp_col)
+}
 
 ui <- fluidPage(
   theme = shinytheme("lumen"),
   # Application title
   titlePanel("Takoma Park Interactive Demographic Map"),
   
+  
   tabsetPanel(
+    type = "pills",
     tabPanel(
       title = "Demographic map",
+      br(),
+      
       shiny::fluidRow(
         shiny::column(width = 4,
                       shiny::selectInput(
@@ -38,10 +67,10 @@ ui <- fluidPage(
           width = 4,
           shiny::selectInput(
             inputId = "montcompare",
-            label = "Show Montgomery County data as well?",
-            choices = c("Yes", "No"),
-            multiple = F,
-            selected = "No"
+            label = "Show Montgomery County, PG County, or DC data as well (Note: may take a moment to load)?",
+            choices = c("Montgomery County", "PG County", "DC"),
+            multiple = T,
+            selected = "None"
           )
         )),
       
@@ -61,6 +90,11 @@ ui <- fluidPage(
             "showwards",
             "Show Ward boundaries?",
             value = T
+          ),
+          shiny::checkboxInput(
+            "showlayers",
+            "Show layers as collapsed?",
+            value = T
           )
         )
         
@@ -69,7 +103,8 @@ ui <- fluidPage(
       
       leaflet::leafletOutput(
         "tractmap",
-        height = 575
+        height = 575,
+        width = "95%"
       ),
       
       br(),
@@ -89,32 +124,49 @@ ui <- fluidPage(
             label = "Download data in map as Excel file"
           )
         )
-      )
+      ),
+      
+      # actionButton(
+      #   "update",
+      #   "Update map"
+      # )
     ),
     tabPanel(
       title = "Background",
       
-      p("The Takoma Park Interactive Demographic map visualizes data from the 2016-2020", a(href = "https://www.census.gov/programs-surveys/acs", "American Community Survey"), ". Data in the map reflects surveys over the period of 2016 to 2020, not any one year. The map will be updated each year with new data from the ACS. The code used to produce this map can be found on the City's Github. Please email Senior Policy and Data Analyst Dan Powers at ", tags$a(href="mailto:danielp@takomaparkmd.gov", "danielp@takomparkmd.gov"), " with any comments or questions.", .noWS = "before-end")
-    )
-    
+      br(),
+      
+      p("The Takoma Park Interactive Demographic map visualizes data from the 2016-2020", a(href = "https://www.census.gov/programs-surveys/acs", "American Community Survey"), "for Takoma Park and Montgomery County. You can select or deselect layers on the map by hovering your mouse over the stack on the left side of the map, and adjust the options to change what data the map displays. Hovering your mouse over a shape will show additional data on the geography. You can also download data displayed on the map as a shapefile or Excel file by hitting a button below the map. Data in the map are from surveys conducted by the Census bureau over the period of 2016 to 2020, not any one year. The map will be updated each year with new data from the ACS. Geographies shown on the map are defined by the Census; block groups and tracts are smaller geographies about the size of neighborhoods, while places are towns and cities. Definitions of terms like Census Block can be found on the", a(href = "https://www.census.gov/programs-surveys/geography/about/glossary.html", "Census Glossary"),  "webpage."),
+      
+      p("The code used to produce this map can be found on the ", tags$a(href = "https://github.com/City-of-Takoma-Park/demogmap", "City's Github."), "Residents may also be interested in the", tags$a(href = "https://r.takomaparkmd.gov/hcd/takomaparkexplorer.html", "City's Data Explorer,"), "which has non-spatial data visualizations of ACS data. Please email Senior Policy and Data Analyst Dan Powers at ", tags$a(href="mailto:danielp@takomaparkmd.gov", "danielp@takomparkmd.gov"), " with any comments or questions.", .noWS = "before-end")
+    ))
+)
+
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
   selectdf <- reactive({ 
-    outdf <- switch(
-      input$tractbg,
-      "Block groups" = switch(
-        input$montcompare, 
-        "Yes" = mont_bg, 
-        "No" = tp_bg
-      ),
-      "Tracts" = switch(
-        input$montcompare, 
-        "Yes" = mont_tract, 
-        "No" = tp_tract
-      ),
-      "Places" = mont_place
-    )
+    
+    if (is.null(input$montcompare)){
+      outdf <- switch(
+        input$tractbg,
+        "Block groups" = tp_bg,
+        "Tracts" = tp_tract,
+        "Places" = tp_place
+      )
+    }
+    
+    else if (!is.null(input$montcompare)){
+      outdf <- switch(
+        input$tractbg,
+        "Block groups" = mont_bg,
+        "Tracts" = mont_tract,
+        "Places" = mont_place
+      )
+      
+      outdf <- outdf %>%
+        filtfunct(input$montcompare)
+    }
     
     # browser()
     outdf %>%
@@ -125,12 +177,15 @@ server <- function(input, output) {
     # req(input$tractbg)
     # req(input$pcttot)
     
+    # req(input$update)
+    
     pct_est <- switch(
       input$pcttot,
       "Percentages" = "pct",
       "Totals" = "estimate"
     )
-    outmap <- gen_acsmap_overall(baseacsdata = selectdf(), pct_est = pct_est, inccountycontrols = F, .collapsed = T)
+    
+    outmap <- gen_acsmap_overall(baseacsdata = selectdf(), pct_est = pct_est, inccountycontrols = F, .collapsed = input$showlayers)
     
     if (input$showwards){
       outmap <- outmap %>%
@@ -148,7 +203,7 @@ server <- function(input, output) {
   
   tpname <- reactive({
     
-    ifelse(input$montcompare == 'Yes', "mont", "tp")
+    ifelse(is.null(input$montcompare), "tp", "mont")
   })
   
   output$downloaddata <- downloadHandler(

@@ -1,0 +1,11 @@
+name: tpdemographicmap
+title: Takoma Park Demographic Map
+username:
+account: takomapark
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6840056
+bundleId: 6248758
+url: https://takomapark.shinyapps.io/tpdemographicmap/
+when: 1661792767.97815
+lastSyncTime: 1661792767.97816

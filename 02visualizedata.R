@@ -39,8 +39,6 @@ readsave_spatial <- function(geom){
     # rename(estimate = age_tot_est,
     #        moe = age_tot_moe) %>%
     pivotfunct( "agegrp")
-  
-  
 
   
   povdf <- readRDS(glue::glue("./data/2020/{geom}/processed/process_vars_pov_ratio.rds")) %>%
@@ -201,8 +199,7 @@ leaflet(mdbg_2020) %>%
   addTiles() 
 
 leaflet(geomrace) %>%
-  addProviderTiles(provider = providers$CartoDB) %>%
-
+  addProviderTiles(provider = providers$CartoDB) 
 
 addbounds <- function(leafletobj, plcgrp = "Place boundaries", spatialdf = mdplace_2020){
   leafletobj %>%
