@@ -7,7 +7,10 @@ library(shinythemes)
 library(openxlsx)
 library(sf)
 library(tpfuncts)
+library(htmlwidgets)
+
 library(mapview)
+# library(webshot)
 
 # setwd("~/r_proj/demogmap/tpdemographicmap")
 # rsconnect::deployApp(appName = "tpdemographicmap", appTitle = "Takoma Park Demographic Map", account = "takomapark")
@@ -30,6 +33,13 @@ fipsmatch <- list(
   "DC" = "001"
 )
 
+# phantomjs_path <- webshot:::find_phantom()
+# if (is.null(phantomjs_path)){
+#   webshot::install_phantomjs()
+#   FlgJS <- F
+# } else{
+#   FlgJS <- T
+# }
 
 filtfunct <- function(df, filtlist){
   
@@ -111,20 +121,27 @@ ui <- fluidPage(
       
       fluidRow(
         column(
-          width = 4,
+          width = 3,
           downloadButton(
             "downloaddata",
             label = "Download data in map as shapefile"
           )
         ),
         column(
-          width = 4,
+          width = 3,
           downloadButton(
             "downloadexcel",
             label = "Download data in map as Excel file"
           )
         )
-      ),
+        # column(
+        #   width = 3,
+        #   downloadButton(
+        #     "pngmap",
+        #     label = "Download screenshot of map"
+        #   )
+        # )
+      )
       
       # actionButton(
       #   "update",
@@ -173,7 +190,7 @@ server <- function(input, output) {
       dplyr::select(-matches("(\\.x.x)|(\\.y)|(\\.z)$", ignore.case = T))
   })
   
-  output$tractmap <- renderLeaflet({
+  outmap <- reactive({
     # req(input$tractbg)
     # req(input$pcttot)
     
@@ -201,6 +218,10 @@ server <- function(input, output) {
     
   })
   
+  output$tractmap <- renderLeaflet({
+    outmap()
+  })
+  
   tpname <- reactive({
     
     ifelse(is.null(input$montcompare), "tp", "mont")
@@ -226,6 +247,28 @@ server <- function(input, output) {
       openxlsx::write.xlsx(sf::st_drop_geometry(selectdf()), file, asTable = T)
     }
   )
+  
+  # widgsave <- reactive({
+  #   saveWidget(widget = outmap(), file = "webmap.html")
+  # }) %>%
+  #   bindEvent(input$pngmap)
+  
+  # output$pngmap <- downloadHandler(
+  #   filename= function(){
+  #     paste0("map_", tpname(), ".png")
+  #   },
+  #   
+  #   content = function(file){
+  #     
+  #     owd <- setwd(tempdir())
+  #     on.exit(setwd(owd))
+  # 
+  #     saveWidget(widget = outmap(), file = "webmap.html", selfcontained = F)
+  #     webshot::webshot("webmap.html", file = file)
+  #     
+  #     # mapview::mapshot(x = outmap(), file = file, remove_controls = T)
+  #   }
+  # )
   
 }
 
