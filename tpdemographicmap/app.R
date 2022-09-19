@@ -1,19 +1,29 @@
+# purpose: generates takoma park interactive demographic map
+# last run: 09/19/2022
+
+
 library(shiny)
 library(leaflet)
-library(leafletwrappers)
 library(tidyverse)
-library(acsmapping)
 library(shinythemes)
 library(openxlsx)
 library(sf)
-library(tpfuncts)
 library(htmlwidgets)
 
 library(mapview)
+
+# packages i've created - download with devtools::install_github("dpowerstp/packagename")
+library(leafletwrappers)
+library(tpfuncts)
+library(acsmapping)
+
 # library(webshot)
 
+# uncomment both of these lines of code and run this code to deply the app
 # setwd("~/r_proj/demogmap/tpdemographicmap")
 # rsconnect::deployApp(appName = "tpdemographicmap", appTitle = "Takoma Park Demographic Map", account = "takomapark")
+
+# read in data
 
 tp_bg <- readRDS("./data/bg_tp.rds")
 
